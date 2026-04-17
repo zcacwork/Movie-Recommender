@@ -88,12 +88,34 @@ movie_name = st.selectbox("Select a movie", movies['title'].values)
 # =========================
 # BUTTON ACTION
 # =========================
+import requests
+
+API_KEY = "YOUR_TMDB_API_KEY"
+
+def fetch_poster(movie_name):
+    url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={movie_name}"
+    data = requests.get(url).json()
+
+    if data["results"]:
+        poster_path = data["results"][0].get("poster_path")
+        if poster_path:
+            return "https://image.tmdb.org/t/p/w500" + poster_path
+
+    return "https://via.placeholder.com/500x750?text=No+Image"
+
+
 if st.button("🍿 Recommend"):
     with st.spinner("Fetching recommendations..."):
         results = hybrid_recommend(user_id, movie_name)
 
-    st.subheader("Top Recommendations:")
-    for movie in results:
-        st.write(movie)
+    st.subheader("🎯 Top Picks For You")
+
+    cols = st.columns(5)
+
+    for i in range(5):
+        with cols[i]:
+            poster = fetch_poster(results[i])
+            st.image(poster)
+            st.caption(results[i])
 
 st.write("UI Loaded Successfully ✅")
