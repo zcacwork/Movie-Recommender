@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pickle
 import os
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -10,10 +9,17 @@ from scipy.sparse.linalg import svds
 
 st.set_page_config(page_title="Movie Recommender", layout="wide")
 
-st.title("🎬 Movie Recommender System")
-st.markdown("## 🍿 Personalized Movie Recommendations")
-
-st.write("App started...")
+# =========================
+# UI HEADER
+# =========================
+st.markdown(
+    "<h1 style='text-align:center;'>🎬 Movie Recommender System</h1>",
+    unsafe_allow_html=True
+)
+st.markdown(
+    "<h3 style='text-align:center;'>🍿 Personalized Movie Recommendations</h3>",
+    unsafe_allow_html=True
+)
 
 # =========================
 # LOAD DATA
@@ -25,39 +31,34 @@ def load_data():
     return movies, ratings
 
 movies, ratings = load_data()
-st.write("Data loaded ✅")
 
 # =========================
-# TRAIN MODELS (AUTO)
+# TRAIN MODELS
 # =========================
 @st.cache_resource
 def train_models():
-    st.write("Training models... ⏳")
-
-    # ---------- CONTENT MODEL ----------
+    # Content-based
     movies['genres'] = movies['genres'].str.replace("|", " ")
     tfidf = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(movies['genres'])
     similarity = cosine_similarity(tfidf_matrix)
 
-    # ---------- COLLAB MODEL ----------
+    # Collaborative (optimized)
     user_item = ratings.pivot(index='userId', columns='movieId', values='rating').fillna(0)
 
     matrix = user_item.values
     mean = np.mean(matrix, axis=1)
     norm_matrix = matrix - mean.reshape(-1, 1)
 
-    # 🔥 REDUCED K (IMPORTANT → prevents blank screen)
+    # 🔥 Reduced k for speed
     U, sigma, Vt = svds(norm_matrix, k=20)
     sigma = np.diag(sigma)
 
     preds = np.dot(np.dot(U, sigma), Vt) + mean.reshape(-1, 1)
 
-    st.write("Models trained ✅")
-
     return similarity, preds, user_item
 
-with st.spinner("Training models... please wait ⏳"):
+with st.spinner("Training recommendation model... ⏳"):
     similarity, preds, user_item = train_models()
 
 # =========================
@@ -75,47 +76,50 @@ def hybrid_recommend(user_id, movie_name, alpha=0.6):
         score = alpha * content_scores[i][1] + (1 - alpha) * collab_scores[i]
         scores.append((i, score))
 
-    ranked = sorted(scores, key=lambda x: x[1], reverse=True)[1:10]
+    ranked = sorted(scores, key=lambda x: x[1], reverse=True)[1:11]
 
     return [movies.iloc[i[0]].title for i in ranked]
 
 # =========================
-# UI INPUT
+# POSTER FUNCTION (NO API)
 # =========================
-user_id = st.number_input("Enter User ID", min_value=1, max_value=600, value=1)
-movie_name = st.selectbox("Select a movie", movies['title'].values)
+def fetch_poster(movie_name):
+    return "https://via.placeholder.com/300x450?text=" + movie_name.replace(" ", "+")
+
+# =========================
+# USER INPUT
+# =========================
+col1, col2 = st.columns(2)
+
+with col1:
+    user_id = st.number_input("Enter User ID", min_value=1, max_value=600, value=1)
+
+with col2:
+    movie_name = st.selectbox("Select a movie", movies['title'].values)
 
 # =========================
 # BUTTON ACTION
 # =========================
-import requests
+if st.button("🍿 Recommend Movies"):
 
-API_KEY = "YOUR_TMDB_API_KEY"
-
-def fetch_poster(movie_name):
-    url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={movie_name}"
-    data = requests.get(url).json()
-
-    if data["results"]:
-        poster_path = data["results"][0].get("poster_path")
-        if poster_path:
-            return "https://image.tmdb.org/t/p/w500" + poster_path
-
-    return "https://via.placeholder.com/500x750?text=No+Image"
-
-
-if st.button("🍿 Recommend"):
-    with st.spinner("Fetching recommendations..."):
+    with st.spinner("Finding best movies for you... 🎯"):
         results = hybrid_recommend(user_id, movie_name)
 
-    st.subheader("🎯 Top Picks For You")
+    st.markdown("## 🎯 Top Picks For You")
 
+    # Display in grid (Netflix style)
     cols = st.columns(5)
 
-    for i in range(5):
-        with cols[i]:
-            poster = fetch_poster(results[i])
-            st.image(poster)
+    for i in range(10):
+        with cols[i % 5]:
+            st.image(fetch_poster(results[i]))
             st.caption(results[i])
 
-st.write("UI Loaded Successfully ✅")
+# =========================
+# FOOTER
+# =========================
+st.markdown("---")
+st.markdown(
+    "<p style='text-align:center;'>Built with ❤️ using Machine Learning</p>",
+    unsafe_allow_html=True
+)
