@@ -1,1 +1,1 @@
-# Movie-Recommender
+A machine learning-based recommendation system that suggests movies to users based on content similarity and user preferences. The model analyzes movie metadata such as genres, cast, and keywords to provide personalized recommendations.# Movie-Recommender
